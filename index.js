@@ -41,6 +41,19 @@ if(interaction.isChatInputCommand()){
 
 if(interaction.commandName==="ticketsetup"){
 
+const membro = interaction.member;
+
+if(
+!membro.roles.cache.has(CEO_ROLE)
+){
+
+return interaction.reply({
+content:"❌ Apenas a equipe pode criar o painel de tickets.",
+ephemeral:true
+});
+
+}
+
 const embed = new EmbedBuilder()
 .setTitle("🌳 Solstice • Central de Tickets")
 .setDescription(`
