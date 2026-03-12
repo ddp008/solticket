@@ -77,6 +77,16 @@ async function garantirPainel() {
   try {
     console.log("Iniciando verificação do painel...");
 
+    if (!process.env.GUILD_ID) {
+      console.log("GUILD_ID não definido.");
+      return;
+    }
+
+    if (!process.env.PANEL_CHANNEL_ID) {
+      console.log("PANEL_CHANNEL_ID não definido.");
+      return;
+    }
+
     const guild = await client.guilds.fetch(process.env.GUILD_ID);
     if (!guild) {
       console.log("Guild não encontrada.");
@@ -132,7 +142,9 @@ client.on("interactionCreate", async (interaction) => {
       const tipo = interaction.values[0];
       const userId = interaction.user.id;
 
-      const tempoRestante = cooldown.get(userId) - Date.now();
+      const ultimoUso = cooldown.get(userId);
+      const tempoRestante = ultimoUso ? ultimoUso - Date.now() : 0;
+
       if (tempoRestante > 0) {
         return interaction.reply({
           content: `⏳ Aguarde ${Math.ceil(tempoRestante / 1000)} segundos para abrir outro ticket.`,
@@ -280,6 +292,7 @@ Explique abaixo com detalhes o que você precisa.
     }
   } catch (error) {
     console.log(error);
+
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
       await interaction.reply({
         content: "❌ Ocorreu um erro ao processar esta ação.",
