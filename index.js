@@ -75,15 +75,27 @@ function criarMenuPainel() {
 
 async function garantirPainel() {
   try {
-    const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    const channel = await guild.channels.fetch(process.env.PANEL_CHANNEL_ID);
+    console.log("Iniciando verificação do painel...");
 
-    if (!channel || !channel.isTextBased()) {
-      console.log("Canal do painel não encontrado ou inválido.");
+    const guild = await client.guilds.fetch(process.env.GUILD_ID);
+    if (!guild) {
+      console.log("Guild não encontrada.");
+      return;
+    }
+
+    const channel = await guild.channels.fetch(process.env.PANEL_CHANNEL_ID);
+    if (!channel) {
+      console.log("Canal do painel não encontrado.");
+      return;
+    }
+
+    if (!channel.isTextBased()) {
+      console.log("O canal do painel não é de texto.");
       return;
     }
 
     const mensagens = await channel.messages.fetch({ limit: 20 });
+
     const painelExistente = mensagens.find(
       (msg) =>
         msg.author.id === client.user.id &&
@@ -104,7 +116,8 @@ async function garantirPainel() {
 
     console.log("Painel enviado com sucesso.");
   } catch (error) {
-    console.log("Erro ao garantir painel:", error);
+    console.log("Erro ao garantir painel:");
+    console.log(error);
   }
 }
 
