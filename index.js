@@ -132,7 +132,7 @@ async function garantirPainel() {
 }
 
 client.once("ready", async () => {
-  console.log(`SolTicket online como ${client.user.tag}`);
+  console.log(`SolTicket online V2 como ${client.user.tag}`);
   await garantirPainel();
 });
 
