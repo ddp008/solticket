@@ -373,7 +373,7 @@ async function atualizarStatus() {
 
         {
           name: "📡 Conectar",
-          value: `\`\`\`connect ${process.env.MC_SERVER_IP}\`\`\``
+          value: `\`\`\` ${process.env.MC_SERVER_IP}\`\`\``
         },
 
         {
@@ -387,9 +387,9 @@ async function atualizarStatus() {
 
       .setImage(process.env.STATUS_IMAGE_URL)
 
-      .setFooter({
-        text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR")}`
-      });
+.setFooter({
+  text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+});
 
     if (!statusMessage) {
 
