@@ -314,8 +314,11 @@ client.login(process.env.TOKEN);
 const mc = require("minecraft-server-util");
 
 let statusMessage = null;
+let ultimaAtualizacao = Date.now();
 
 async function atualizarStatus() {
+
+  ultimaAtualizacao = Date.now();
 
   try {
 
@@ -387,9 +390,9 @@ async function atualizarStatus() {
 
       .setImage(process.env.STATUS_IMAGE_URL)
 
-.setFooter({
-  text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
-});
+      .setFooter({
+        text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+      });
 
     if (!statusMessage) {
 
