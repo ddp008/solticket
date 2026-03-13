@@ -132,8 +132,13 @@ async function garantirPainel() {
 }
 
 client.once("ready", async () => {
-  console.log(`SolTicket online V2 como ${client.user.tag}`);
+  console.log(`SolTicket online como ${client.user.tag}`);
+
   await garantirPainel();
+
+  // inicia painel de status
+  await atualizarStatus();
+  setInterval(atualizarStatus, 60000);
 });
 
 client.on("interactionCreate", async (interaction) => {
@@ -303,3 +308,111 @@ Explique abaixo com detalhes o que você precisa.
 });
 
 client.login(process.env.TOKEN);
+
+
+
+const mc = require("minecraft-server-util");
+
+let statusMessage = null;
+
+async function atualizarStatus() {
+
+  try {
+
+    const guild = await client.guilds.fetch(process.env.GUILD_ID);
+    const channel = await guild.channels.fetch(process.env.STATUS_CHANNEL_ID);
+
+    if (!channel || !channel.isTextBased()) return;
+
+    let status = "🔴 Offline";
+    let playersOnline = 0;
+    let playersMax = 0;
+    let playerList = "Nenhum jogador online.";
+
+    try {
+
+      const response = await mc.status(
+        process.env.MC_SERVER_IP,
+        parseInt(process.env.MC_SERVER_PORT)
+      );
+
+      status = "🟢 Online";
+      playersOnline = response.players.online;
+      playersMax = response.players.max;
+
+      if (response.players.sample && response.players.sample.length > 0) {
+
+        playerList = response.players.sample
+          .map(p => `• ${p.name}`)
+          .join("\n");
+
+      }
+
+    } catch {
+      status = "🔴 Offline";
+    }
+
+    const embed = new EmbedBuilder()
+
+      .setTitle("🌳 Solstice • Status do Servidor")
+      .setColor(status === "🟢 Online" ? 0x3ba55d : 0xed4245)
+
+      .addFields(
+
+        {
+          name: "🟢 Status",
+          value: `\`\`\`${status}\`\`\``,
+          inline: true
+        },
+
+        {
+          name: "👥 Jogadores",
+          value: `\`\`\`${playersOnline} / ${playersMax}\`\`\``,
+          inline: true
+        },
+
+        {
+          name: "📡 Conectar",
+          value: `\`\`\`connect ${process.env.MC_SERVER_IP}\`\`\``
+        },
+
+        {
+          name: "📜 Jogadores Online",
+          value: playerList.length > 1000
+            ? playerList.substring(0, 1000) + "..."
+            : playerList
+        }
+
+      )
+
+      .setImage(process.env.STATUS_IMAGE_URL)
+
+      .setFooter({
+        text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR")}`
+      });
+
+    if (!statusMessage) {
+
+      const mensagens = await channel.messages.fetch({ limit: 10 });
+
+      statusMessage = mensagens.find(
+        m => m.author.id === client.user.id
+      );
+
+      if (!statusMessage) {
+        statusMessage = await channel.send({ embeds: [embed] });
+      }
+
+    } else {
+
+      await statusMessage.edit({ embeds: [embed] });
+
+    }
+
+  } catch (error) {
+
+    console.log("Erro no status:", error);
+
+  }
+
+}
