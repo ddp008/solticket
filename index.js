@@ -1,421 +1,364 @@
 const {
-  Client,
-  GatewayIntentBits,
-  PermissionsBitField,
-  ChannelType,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  EmbedBuilder,
-} = require("discord.js");
+Client,
+GatewayIntentBits,
+PermissionsBitField,
+ChannelType,
+ActionRowBuilder,
+ButtonBuilder,
+ButtonStyle,
+StringSelectMenuBuilder,
+EmbedBuilder
+} = require("discord.js")
 
-const transcripts = require("discord-html-transcripts");
-require("dotenv").config();
+const transcripts = require("discord-html-transcripts")
+const mc = require("minecraft-server-util")
+
+require("dotenv").config()
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
-});
+intents:[
+GatewayIntentBits.Guilds,
+GatewayIntentBits.GuildMessages,
+GatewayIntentBits.MessageContent
+]
+})
 
-const STAFF_ROLE = "1463732923399143425";
-const CEO_ROLE = "1475900068744794327";
+const STAFF_ROLE="1463732923399143425"
+const CEO_ROLE="1475900068744794327"
 
-const tipos = {
-  suporte: { nome: "Suporte / Dúvidas", emoji: "🛠️", prefixo: "suporte" },
-  historia: { nome: "História", emoji: "📜", prefixo: "historia" },
-  doacao: { nome: "Doação / Requisito", emoji: "💰", prefixo: "doacao" },
-};
+const cooldown=new Map()
 
-const cooldown = new Map();
+let statusMessage=null
+let ultimaAtualizacao=Date.now()
 
-function criarEmbedPainel() {
-  return new EmbedBuilder()
-    .setTitle("🌳 Solstice • Central de Tickets")
-    .setDescription(`
-Precisa de ajuda? Abra um ticket e nossa equipe irá te atender.
+const tipos={
 
-**Utilize o ticket para:**
+suporte:{nome:"Suporte Técnico",emoji:"🛠️",prefixo:"suporte"},
+historia:{nome:"História / Lore",emoji:"📜",prefixo:"lore"},
+doacao:{nome:"Doações",emoji:"💰",prefixo:"doacao"},
+entrevista:{nome:"Entrevista",emoji:"🎤",prefixo:"entrevista"}
 
-• 🛠️ Suporte geral  
-• 📜 Questões de história  
-• 💰 Doações
+}
+
+function tempoRelativo(){
+
+const segundos=Math.floor((Date.now()-ultimaAtualizacao)/1000)
+
+if(segundos<60)return"Atualizado agora"
+
+const minutos=Math.floor(segundos/60)
+
+if(minutos===1)return"Atualizado há 1 minuto"
+
+return`Atualizado há ${minutos} minutos`
+
+}
+
+function criarEmbedPainel(){
+
+return new EmbedBuilder()
+
+.setTitle("🌳 Solstice • Central de Suporte")
+
+.setDescription(`
+
+Antes de abrir um ticket leia atentamente.
+
+Abra ticket apenas se realmente precisar da STAFF.
+
+🛠️ Suporte técnico  
+Problemas ou bugs.
+
+📜 História  
+Dúvidas sobre lore.
+
+💰 Doações  
+Problemas com compra.
+
+🎤 Entrevista  
+Agendar entrevista.
+
+Tickets indevidos podem ser fechados.
+
 `)
-    .setColor(0x8b5cf6)
-    .setImage(process.env.TICKET_IMAGE_URL)
-    .setFooter({ text: "Solstice SMP © Todos os direitos reservados" });
+
+.setColor(0x8b5cf6)
+
+.setImage(process.env.TICKET_IMAGE_URL)
+
+.setFooter({text:"Solstice SMP • Sistema oficial de suporte"})
+
 }
 
-function criarMenuPainel() {
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId("ticket_menu")
-    .setPlaceholder("Selecione a categoria do ticket")
-    .addOptions(
-      {
-        label: "Suporte / Dúvidas",
-        value: "suporte",
-        emoji: "🛠️",
-        description: "Problemas técnicos ou ajuda geral",
-      },
-      {
-        label: "História",
-        value: "historia",
-        emoji: "📜",
-        description: "Questões sobre lore ou narrativa",
-      },
-      {
-        label: "Doação / Requisito",
-        value: "doacao",
-        emoji: "💰",
-        description: "Benefícios, apoio ou requisitos",
-      }
-    );
+function criarMenuPainel(){
 
-  return new ActionRowBuilder().addComponents(menu);
+return new ActionRowBuilder().addComponents(
+
+new StringSelectMenuBuilder()
+
+.setCustomId("ticket_menu")
+
+.setPlaceholder("Selecione o tipo de ticket")
+
+.addOptions(
+
+{label:"Suporte Técnico",value:"suporte",emoji:"🛠️",description:"Problemas técnicos"},
+{label:"História / Lore",value:"historia",emoji:"📜",description:"Questões de história"},
+{label:"Doações",value:"doacao",emoji:"💰",description:"Problemas com benefícios"},
+{label:"Entrevista",value:"entrevista",emoji:"🎤",description:"Agendar entrevista"}
+
+)
+
+)
+
 }
 
-async function garantirPainel() {
-  try {
-    console.log("Iniciando verificação do painel...");
+async function garantirPainel(){
 
-    if (!process.env.GUILD_ID) {
-      console.log("GUILD_ID não definido.");
-      return;
-    }
+const guild=await client.guilds.fetch(process.env.GUILD_ID)
+const channel=await guild.channels.fetch(process.env.PANEL_CHANNEL_ID)
 
-    if (!process.env.PANEL_CHANNEL_ID) {
-      console.log("PANEL_CHANNEL_ID não definido.");
-      return;
-    }
+const msgs=await channel.messages.fetch({limit:20})
 
-    const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    if (!guild) {
-      console.log("Guild não encontrada.");
-      return;
-    }
+const existe=msgs.find(m=>m.author.id===client.user.id)
 
-    const channel = await guild.channels.fetch(process.env.PANEL_CHANNEL_ID);
-    if (!channel) {
-      console.log("Canal do painel não encontrado.");
-      return;
-    }
+if(existe)return
 
-    if (!channel.isTextBased()) {
-      console.log("O canal do painel não é de texto.");
-      return;
-    }
+await channel.send({
 
-    const mensagens = await channel.messages.fetch({ limit: 20 });
+embeds:[criarEmbedPainel()],
+components:[criarMenuPainel()]
 
-    const painelExistente = mensagens.find(
-      (msg) =>
-        msg.author.id === client.user.id &&
-        msg.embeds.length > 0 &&
-        msg.embeds[0].title &&
-        msg.embeds[0].title.includes("Central de Tickets")
-    );
+})
 
-    if (painelExistente) {
-      console.log("Painel já existe no canal.");
-      return;
-    }
-
-    await channel.send({
-      embeds: [criarEmbedPainel()],
-      components: [criarMenuPainel()],
-    });
-
-    console.log("Painel enviado com sucesso.");
-  } catch (error) {
-    console.log("Erro ao garantir painel:");
-    console.log(error);
-  }
 }
 
-client.once("ready", async () => {
-  console.log(`SolTicket online como ${client.user.tag}`);
+async function atualizarStatus(){
 
-  await garantirPainel();
+ultimaAtualizacao=Date.now()
 
-  // inicia painel de status
-  await atualizarStatus();
-  setInterval(atualizarStatus, 60000);
-});
+try{
 
-client.on("interactionCreate", async (interaction) => {
-  try {
-    if (interaction.isStringSelectMenu() && interaction.customId === "ticket_menu") {
-      const tipo = interaction.values[0];
-      const userId = interaction.user.id;
+const guild=await client.guilds.fetch(process.env.GUILD_ID)
+const channel=await guild.channels.fetch(process.env.STATUS_CHANNEL_ID)
 
-      const ultimoUso = cooldown.get(userId);
-      const tempoRestante = ultimoUso ? ultimoUso - Date.now() : 0;
+let status="🔴 Offline"
+let online=0
+let max=0
+let lista="Nenhum jogador online."
 
-      if (tempoRestante > 0) {
-        return interaction.reply({
-          content: `⏳ Aguarde ${Math.ceil(tempoRestante / 1000)} segundos para abrir outro ticket.`,
-          ephemeral: true,
-        });
-      }
+try{
 
-      const existente = interaction.guild.channels.cache.find(
-        (c) => c.topic && c.topic.includes(`TICKET_OWNER:${interaction.user.id}`)
-      );
+const res=await mc.status(process.env.MC_SERVER_IP,parseInt(process.env.MC_SERVER_PORT))
 
-      if (existente) {
-        return interaction.reply({
-          content: `Você já possui um ticket aberto: ${existente}`,
-          ephemeral: true,
-        });
-      }
+status="🟢 Online"
+online=res.players.online
+max=res.players.max
 
-      cooldown.set(userId, Date.now() + 60000);
+if(res.players.sample&&res.players.sample.length>0){
 
-      const nomeUsuario = interaction.user.username
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]/g, "")
-        .slice(0, 15);
-
-      const canal = await interaction.guild.channels.create({
-        name: `${tipos[tipo].prefixo}-${nomeUsuario}`,
-        type: ChannelType.GuildText,
-        parent: process.env.TICKET_CATEGORY_ID,
-        topic: `TICKET_OWNER:${interaction.user.id}`,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.roles.everyone.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: interaction.user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-            ],
-          },
-          {
-            id: STAFF_ROLE,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-            ],
-          },
-          {
-            id: CEO_ROLE,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-            ],
-          },
-        ],
-      });
-
-      const embedTicket = new EmbedBuilder()
-        .setTitle(`🎫 Ticket • ${tipos[tipo].nome}`)
-        .setDescription(`
-Olá ${interaction.user}!
-
-Explique abaixo com detalhes o que você precisa.
-
-**Categoria:** ${tipos[tipo].nome}
-`)
-        .setColor(0x8b5cf6)
-        .setImage(process.env.TICKET_IMAGE_URL)
-        .setFooter({ text: "🌳 Sistema de suporte • Solstice" });
-
-      const botoes = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("assumir_ticket")
-          .setLabel("Assumir Ticket")
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId("fechar_ticket")
-          .setLabel("Fechar Ticket")
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await canal.send({
-        content: `<@&${STAFF_ROLE}>`,
-        embeds: [embedTicket],
-        components: [botoes],
-      });
-
-      return interaction.reply({
-        content: `Seu ticket foi criado: ${canal}`,
-        ephemeral: true,
-      });
-    }
-
-    if (interaction.isButton() && interaction.customId === "assumir_ticket") {
-      return interaction.reply({
-        content: `${interaction.user} assumiu este ticket.`,
-      });
-    }
-
-    if (interaction.isButton() && interaction.customId === "fechar_ticket") {
-      const membro = interaction.member;
-
-      if (
-        !membro.roles.cache.has(STAFF_ROLE) &&
-        !membro.roles.cache.has(CEO_ROLE)
-      ) {
-        return interaction.reply({
-          content: "❌ Apenas STAFF ou CEO podem fechar ticket.",
-          ephemeral: true,
-        });
-      }
-
-      const attachment = await transcripts.createTranscript(interaction.channel, {
-        limit: -1,
-        filename: `transcript-${interaction.channel.name}.html`,
-      });
-
-      const logChannel = interaction.guild.channels.cache.get(process.env.LOG_CHANNEL_ID);
-
-      if (logChannel && logChannel.isTextBased()) {
-        await logChannel.send({
-          content: `📁 Ticket fechado: ${interaction.channel.name}`,
-          files: [attachment],
-        });
-      }
-
-      await interaction.channel.setParent(process.env.ARCHIVE_CATEGORY_ID);
-
-      await interaction.channel.permissionOverwrites.edit(
-        interaction.guild.roles.everyone,
-        { SendMessages: false }
-      );
-
-      await interaction.reply({
-        content: "📁 Ticket arquivado e transcript salvo.",
-        ephemeral: true,
-      });
-    }
-  } catch (error) {
-    console.log(error);
-
-    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: "❌ Ocorreu um erro ao processar esta ação.",
-        ephemeral: true,
-      });
-    }
-  }
-});
-
-client.login(process.env.TOKEN);
-
-
-
-const mc = require("minecraft-server-util");
-
-let statusMessage = null;
-let ultimaAtualizacao = Date.now();
-
-async function atualizarStatus() {
-
-  ultimaAtualizacao = Date.now();
-
-  try {
-
-    const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    const channel = await guild.channels.fetch(process.env.STATUS_CHANNEL_ID);
-
-    if (!channel || !channel.isTextBased()) return;
-
-    let status = "🔴 Offline";
-    let playersOnline = 0;
-    let playersMax = 0;
-    let playerList = "Nenhum jogador online.";
-
-    try {
-
-      const response = await mc.status(
-        process.env.MC_SERVER_IP,
-        parseInt(process.env.MC_SERVER_PORT)
-      );
-
-      status = "🟢 Online";
-      playersOnline = response.players.online;
-      playersMax = response.players.max;
-
-      if (response.players.sample && response.players.sample.length > 0) {
-
-        playerList = response.players.sample
-          .map(p => `• ${p.name}`)
-          .join("\n");
-
-      }
-
-    } catch {
-      status = "🔴 Offline";
-    }
-
-    const embed = new EmbedBuilder()
-
-      .setTitle("🌳 Solstice • Status do Servidor")
-      .setColor(status === "🟢 Online" ? 0x3ba55d : 0xed4245)
-
-      .addFields(
-
-        {
-          name: "🟢 Status",
-          value: `\`\`\`${status}\`\`\``,
-          inline: true
-        },
-
-        {
-          name: "👥 Jogadores",
-          value: `\`\`\`${playersOnline} / ${playersMax}\`\`\``,
-          inline: true
-        },
-
-        {
-          name: "📡 Conectar",
-          value: `\`\`\` ${process.env.MC_SERVER_IP}\`\`\``
-        },
-
-        {
-          name: "📜 Jogadores Online",
-          value: playerList.length > 1000
-            ? playerList.substring(0, 1000) + "..."
-            : playerList
-        }
-
-      )
-
-      .setImage(process.env.STATUS_IMAGE_URL)
-
-      .setFooter({
-        text: `Atualizado • ${new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
-      });
-
-    if (!statusMessage) {
-
-      const mensagens = await channel.messages.fetch({ limit: 10 });
-
-      statusMessage = mensagens.find(
-        m => m.author.id === client.user.id
-      );
-
-      if (!statusMessage) {
-        statusMessage = await channel.send({ embeds: [embed] });
-      }
-
-    } else {
-
-      await statusMessage.edit({ embeds: [embed] });
-
-    }
-
-  } catch (error) {
-
-    console.log("Erro no status:", error);
-
-  }
+lista=res.players.sample.map(p=>`• ${p.name}`).join("\n")
 
 }
+
+}catch{}
+
+const embed=new EmbedBuilder()
+
+.setTitle("🌳 Solstice • Status do Servidor")
+
+.setColor(status==="🟢 Online"?0x3ba55d:0xed4245)
+
+.addFields(
+
+{name:"Status",value:`\`\`\`${status}\`\`\``,inline:true},
+{name:"Jogadores",value:`\`\`\`${online}/${max}\`\`\``,inline:true},
+{name:"Conectar",value:`\`\`\`connect ${process.env.MC_SERVER_IP}\`\`\``},
+{name:"Jogadores Online",value:lista.length>1000?lista.slice(0,1000)+"...":lista}
+
+)
+
+.setImage(process.env.STATUS_IMAGE_URL)
+
+.setFooter({text:`🔄 ${tempoRelativo()}`})
+
+if(!statusMessage){
+
+const msgs=await channel.messages.fetch({limit:10})
+
+statusMessage=msgs.find(m=>m.author.id===client.user.id)
+
+if(!statusMessage){
+
+statusMessage=await channel.send({embeds:[embed]})
+
+}
+
+}else{
+
+await statusMessage.edit({embeds:[embed]})
+
+}
+
+}catch(err){
+
+console.log("Erro status",err)
+
+}
+
+}
+
+client.once("ready",async()=>{
+
+console.log(`Bot online como ${client.user.tag}`)
+
+await garantirPainel()
+
+await atualizarStatus()
+
+setInterval(atualizarStatus,60000)
+
+})
+
+client.on("interactionCreate",async interaction=>{
+
+if(interaction.isStringSelectMenu()&&interaction.customId==="ticket_menu"){
+
+const tipo=interaction.values[0]
+
+const userId=interaction.user.id
+
+if(cooldown.has(userId)){
+
+return interaction.reply({content:"Aguarde antes de abrir outro ticket.",ephemeral:true})
+
+}
+
+cooldown.set(userId,true)
+
+setTimeout(()=>cooldown.delete(userId),60000)
+
+const existente=interaction.guild.channels.cache.find(c=>c.topic&&c.topic.includes(`TICKET_OWNER:${userId}`))
+
+if(existente){
+
+return interaction.reply({content:`Você já possui ticket: ${existente}`,ephemeral:true})
+
+}
+
+const nome=interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)
+
+const canal=await interaction.guild.channels.create({
+
+name:`${tipos[tipo].prefixo}-${nome}`,
+
+type:ChannelType.GuildText,
+
+parent:process.env.TICKET_CATEGORY_ID,
+
+topic:`TICKET_OWNER:${userId}`,
+
+permissionOverwrites:[
+
+{id:interaction.guild.roles.everyone.id,deny:[PermissionsBitField.Flags.ViewChannel]},
+
+{id:userId,allow:[PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages]},
+
+{id:STAFF_ROLE,allow:[PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages]},
+
+{id:CEO_ROLE,allow:[PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages]}
+
+]
+
+})
+
+const embed=new EmbedBuilder()
+
+.setTitle(`🎫 Ticket • ${tipos[tipo].nome}`)
+
+.setDescription(`Olá ${interaction.user}\n\nExplique detalhadamente seu problema.`)
+
+.setColor(0x8b5cf6)
+
+.setImage(process.env.TICKET_IMAGE_URL)
+
+const row=new ActionRowBuilder().addComponents(
+
+new ButtonBuilder().setCustomId("assumir_ticket").setLabel("Assumir").setStyle(ButtonStyle.Primary),
+
+new ButtonBuilder().setCustomId("fechar_ticket").setLabel("Fechar").setStyle(ButtonStyle.Danger)
+
+)
+
+await canal.send({
+
+content:`<@&${STAFF_ROLE}>`,
+embeds:[embed],
+components:[row]
+
+})
+
+interaction.reply({content:`Ticket criado: ${canal}`,ephemeral:true})
+
+}
+
+if(interaction.isButton()&&interaction.customId==="fechar_ticket"){
+
+const membro=interaction.member
+
+if(!membro.roles.cache.has(STAFF_ROLE)&&!membro.roles.cache.has(CEO_ROLE)){
+
+return interaction.reply({content:"Apenas STAFF ou CEO podem fechar.",ephemeral:true})
+
+}
+
+const attachment=await transcripts.createTranscript(interaction.channel)
+
+const logChannel=interaction.guild.channels.cache.get(process.env.LOG_CHANNEL_ID)
+
+if(logChannel){
+
+await logChannel.send({content:`Ticket fechado ${interaction.channel.name}`,files:[attachment]})
+
+}
+
+await interaction.channel.setParent(process.env.ARCHIVE_CATEGORY_ID)
+
+await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone,{SendMessages:false})
+
+interaction.reply({content:"Ticket arquivado.",ephemeral:true})
+
+}
+
+})
+
+client.on("messageCreate",async message=>{
+
+if(message.author.bot)return
+
+if(!message.content.startsWith("/"))return
+
+const canal=await message.guild.channels.fetch(process.env.COMMAND_LOG_CHANNEL_ID)
+
+if(!canal)return
+
+const embed=new EmbedBuilder()
+
+.setTitle("Log de comando")
+
+.addFields(
+
+{name:"Nick",value:message.author.username},
+{name:"Comando",value:message.content}
+
+)
+
+.setColor(0xffcc00)
+
+.setTimestamp()
+
+canal.send({embeds:[embed]})
+
+})
+
+client.login(process.env.TOKEN)
