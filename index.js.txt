@@ -173,7 +173,7 @@ const embed=new EmbedBuilder()
 
 {name:"Status",value:`\`\`\`${status}\`\`\``,inline:true},
 {name:"Jogadores",value:`\`\`\`${online}/${max}\`\`\``,inline:true},
-{name:"Conectar",value:`\`\`\`connect ${process.env.MC_SERVER_IP}\`\`\``},
+{name:"Conectar",value:`\`\`\`${process.env.MC_SERVER_IP}\`\`\``},
 {name:"Jogadores Online",value:lista.length>1000?lista.slice(0,1000)+"...":lista}
 
 )
