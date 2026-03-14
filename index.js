@@ -421,7 +421,7 @@ A equipe irá analisar e confirmar o agendamento.
       return `
 Olá ${userMention}
 
-Explique detalhadamente o motivo do ticket.
+Explique detalhadamente o motivo do ticket!
 `;
   }
 }
