@@ -154,11 +154,17 @@ async function comandoAtividade(interaction) {
    EVENTOS
 ========================================================= */
 
-client.once("ready", () => {
-  console.log(`Online como ${client.user.tag}`);
-  setInterval(atualizarStatus, 600000);
-});
+client.once("ready", async () => {
+  console.log(`Bot online como ${client.user.tag}`);
 
+  await registerCommands();
+  await loadFaqCache();
+  await garantirPainel();
+  await atualizarStatus();
+
+  setInterval(atualizarStatus, 600000);
+  setInterval(loadFaqCache, 300000);
+});
 client.on("interactionCreate", async (interaction) => {
   try {
 
@@ -201,3 +207,49 @@ client.on("messageCreate", async (msg) => {
 });
 
 client.login(process.env.TOKEN);
+
+async function registerCommands() {
+  const guild = await client.guilds.fetch(process.env.GUILD_ID);
+
+  await guild.commands.set([
+    {
+      name: "agradecer",
+      description: "Agradecer jogador",
+      options: [
+        {
+          name: "tipo",
+          type: 3,
+          required: true,
+          choices: [
+            { name: "boost", value: "boost" },
+            { name: "doacao", value: "doacao" }
+          ]
+        },
+        {
+          name: "user",
+          type: 6,
+          required: true
+        },
+        {
+          name: "valor",
+          type: 3,
+          required: false
+        }
+      ]
+    },
+    {
+      name: "atividade",
+      description: "Ver tempo online",
+      options: [
+        {
+          name: "nick",
+          type: 3,
+          required: true
+        }
+      ]
+    }
+  ]);
+}
+
+console.log("Painel enviado");
+console.log("Status atualizado");
