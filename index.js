@@ -767,25 +767,6 @@ async function handleAiResponse(message) {
   if (message.author.bot) return;
   if (!isTicketChannel(message.channel)) return;
   if (aiDisabledChannels.has(message.channel.id)) return;
-
-  if (isStaff(message.member)) return;
-
-  const bestAnswer = findBestFaqAnswer(message.content);
-
-  if (!bestAnswer) return;
-
-  await message.reply(
-    `${bestAnswer}\n\nSe isso não resolver, use o botão **Chamar Suporte**.`
-  );
-}
-
-  // só responde em ticket
-  if (!isTicketChannel(message.channel)) return;
-
-  // se suporte foi chamado, para IA
-  if (aiDisabledChannels.has(message.channel.id)) return;
-
-  // ignora staff
   if (isStaff(message.member)) return;
 
   const bestAnswer = findBestFaqAnswer(message.content);
