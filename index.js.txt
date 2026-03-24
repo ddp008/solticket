@@ -187,9 +187,20 @@ async function handleAiResponse(message) {
 /* ================= READY ================= */
 
 client.once("ready", async () => {
-  console.log(`Bot online: ${client.user.tag}`);
+  console.log(`✅ Bot online como ${client.user.tag}`);
 
-  await loadFaqCache();
+  try {
+    await registerCommands();
+    await loadFaqCache();
+    await garantirPainel();
+    await atualizarStatus();
+
+    setInterval(atualizarStatus, 600000);
+    setInterval(loadFaqCache, 300000);
+
+  } catch (err) {
+    console.log("Erro no ready:", err);
+  }
 });
 
 /* ================= INTERACTION ================= */
