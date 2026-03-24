@@ -201,6 +201,10 @@ client.once("ready", async () => {
   } catch (err) {
     console.log("Erro no ready:", err);
   }
+const guild = await client.guilds.fetch(process.env.GUILD_ID);
+const canal = await guild.channels.fetch(process.env.PANEL_CHANNEL_ID);
+
+await canal.send("TESTE FUNCIONANDO");
 });
 
 /* ================= INTERACTION ================= */
