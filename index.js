@@ -903,6 +903,26 @@ async function comandoAgradecer(interaction) {
 }
 client.on("interactionCreate", async (interaction) => {
   try {
+
+    if (interaction.isChatInputCommand()) {
+
+      if (!isStaff(interaction.member)) {
+        return interaction.reply({
+          content: "❌ Apenas STAFF ou CEO podem usar.",
+          ephemeral: true
+        });
+      }
+
+      if (interaction.commandName === "agradecer") {
+        return comandoAgradecer(interaction);
+      }
+
+    }
+
+  } catch (err) {
+    console.log("Erro interaction:", err);
+  }
+});
     /* ---------- MENU DE TICKET ---------- */
     if (
       interaction.isStringSelectMenu() &&
@@ -1126,9 +1146,6 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
-if (interaction.commandName === "agradecer") {
-  return comandoAgradecer(interaction);
-}
 
 client.on("messageCreate", async (message) => {
   try {
