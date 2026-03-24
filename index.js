@@ -22,6 +22,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers
   ],
 });
 
@@ -118,6 +119,28 @@ async function archiveTicket(channel, guild, reasonText) {
   const attachment = await transcripts.createTranscript(channel, {
     filename: `transcript-${channel.name}.html`,
   });
+
+async function loadFaqCache() {
+  try {
+    const guild = await client.guilds.fetch(process.env.GUILD_ID);
+    const canal = await guild.channels.fetch(process.env.AI_CONTENT_CHANNEL_ID);
+
+    if (!canal || !canal.isTextBased()) {
+      console.log("Canal da IA não encontrado.");
+      return;
+    }
+
+    const messages = await canal.messages.fetch({ limit: 100 });
+
+    faqCache = messages
+      .filter(msg => !msg.author.bot && msg.content.trim().length > 0)
+      .map(msg => msg.content.toLowerCase());
+
+    console.log(`IA carregada com ${faqCache.length} respostas.`);
+  } catch (err) {
+    console.log("Erro ao carregar IA:", err);
+  }
+}
 
   const logChannel = await guild.channels.fetch(process.env.LOG_CHANNEL_ID);
   if (logChannel && logChannel.isTextBased()) {
@@ -630,6 +653,34 @@ async function registerCommands() {
         },
       ],
     },
+    {
+      name: "agradecer",
+      description: "Enviar mensagem de agradecimento por boost ou doação",
+      options: [
+        {
+          name: "tipo",
+          description: "Tipo de apoio recebido",
+          type: 3,
+          required: true,
+          choices: [
+            { name: "boost", value: "boost" },
+            { name: "doacao", value: "doacao" },
+          ],
+        },
+        {
+          name: "user",
+          description: "Usuário que será agradecido",
+          type: 6,
+          required: true,
+        },
+        {
+          name: "valor",
+          description: "Valor da doação (use apenas se for doação)",
+          type: 3,
+          required: false,
+        },
+      ],
+    },
   ]);
 }
 
@@ -750,6 +801,27 @@ async function handleAiResponse(message) {
   );
 }
 
+async function handleAiResponse(message) {
+  if (message.author.bot) return;
+
+  // só responde em ticket
+  if (!isTicketChannel(message.channel)) return;
+
+  // se suporte foi chamado, para IA
+  if (aiDisabledChannels.has(message.channel.id)) return;
+
+  // ignora staff
+  if (isStaff(message.member)) return;
+
+  const bestAnswer = findBestFaqAnswer(message.content);
+
+  if (!bestAnswer) return;
+
+  await message.reply(
+    `${bestAnswer}\n\nSe isso não resolver, use o botão **Chamar Suporte**.`
+  );
+}
+
 /* =========================================================
    8) EVENTOS
 ========================================================= */
@@ -766,6 +838,69 @@ client.once("ready", async () => {
   setInterval(loadFaqCache, 300000);
 });
 
+async function comandoAgradecer(interaction) {
+  const tipo = interaction.options.getString("tipo");
+  const user = interaction.options.getUser("user");
+  const valor = interaction.options.getString("valor");
+
+  const canal = await interaction.guild.channels.fetch("1485518997373059122");
+
+  if (!canal || !canal.isTextBased()) {
+    return interaction.reply({
+      content: "❌ Não consegui encontrar o canal de agradecimento.",
+      ephemeral: true,
+    });
+  }
+
+  let embed;
+
+  if (tipo === "boost") {
+    embed = new EmbedBuilder()
+      .setTitle("💜 Obrigado por apoiar o Solstice!")
+      .setDescription(
+        `${user}, muito obrigado pelo **boost** no servidor!\n\nSeu apoio ajuda diretamente no crescimento do Solstice e fortalece ainda mais o projeto. ✨`
+      )
+      .setColor(0x8b5cf6)
+      .setFooter({
+        text: "© Solstice - Todos os direitos reservados.",
+      })
+      .setTimestamp();
+  }
+
+  if (tipo === "doacao") {
+    embed = new EmbedBuilder()
+      .setTitle("💰 Obrigado por apoiar o Solstice!")
+      .setDescription(
+        `${user}, muito obrigado pela sua **doação${valor ? ` de R$${valor}` : ""}**!\n\nSeu apoio ajuda a manter o servidor ativo, em evolução e cada vez melhor para todos. 🚀`
+      )
+      .setColor(0x8b5cf6)
+      .setFooter({
+        text: "© Solstice - Todos os direitos reservados.",
+      })
+      .setTimestamp();
+  }
+
+  if (!embed) {
+    return interaction.reply({
+      content: "❌ Tipo de agradecimento inválido.",
+      ephemeral: true,
+    });
+  }
+
+  await canal.send({ embeds: [embed] });
+
+  await sendCommandLog(
+    interaction.guild,
+    interaction.user,
+    "/agradecer",
+    `Tipo: ${tipo} | Alvo: ${user.username}${valor ? ` | Valor: R$${valor}` : ""}`
+  );
+
+  return interaction.reply({
+    content: "✅ Agradecimento enviado com sucesso.",
+    ephemeral: true,
+  });
+}
 client.on("interactionCreate", async (interaction) => {
   try {
     /* ---------- MENU DE TICKET ---------- */
@@ -991,6 +1126,9 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
+if (interaction.commandName === "agradecer") {
+  return comandoAgradecer(interaction);
+}
 
 client.on("messageCreate", async (message) => {
   try {
@@ -1001,3 +1139,35 @@ client.on("messageCreate", async (message) => {
 });
 
 client.login(process.env.TOKEN);
+
+client.on("guildMemberUpdate", async (oldMember, newMember) => {
+  try {
+
+    // usuário começou a dar boost
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+
+      const canal = await newMember.guild.channels.fetch("1485518997373059122");
+
+      if (!canal || !canal.isTextBased()) return;
+
+      const embed = new EmbedBuilder()
+        .setTitle("💜 Novo Boost no Servidor!")
+        .setDescription(
+`${newMember} muito obrigado pelo **boost** no servidor!\n\nSeu apoio ajuda diretamente no crescimento do Solstice e fortalece ainda mais o projeto. ✨
+        )
+        .setColor(0x8b5cf6)
+        .setThumbnail(newMember.user.displayAvatarURL())
+        .setFooter({
+          text: "© Solstice - Todos os direitos reservados.",
+        })
+        .setTimestamp();
+
+      await canal.send({ embeds: [embed] });
+
+      console.log(`BOOST detectado: ${newMember.user.tag}`);
+    }
+
+  } catch (err) {
+    console.log("Erro boost:", err);
+  }
+});
