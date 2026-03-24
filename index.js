@@ -184,6 +184,83 @@ async function handleAiResponse(message) {
   await message.reply(`${resposta}\n\nClique em **Chamar Suporte** se precisar.`);
 }
 
+/* ================= RegisterCommands ================= */
+
+async function registerCommands() {
+  const guild = await client.guilds.fetch(process.env.GUILD_ID);
+
+  await guild.commands.set([
+    {
+      name: "add",
+      description: "Adicionar uma pessoa ao ticket atual",
+      options: [
+        {
+          name: "user",
+          description: "Usuário a ser adicionado",
+          type: 6,
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "remove",
+      description: "Remover uma pessoa do ticket atual",
+      options: [
+        {
+          name: "user",
+          description: "Usuário a ser removido",
+          type: 6,
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "manutencao",
+      description: "Ativar ou desativar o modo manutenção",
+      options: [
+        {
+          name: "modo",
+          description: "on ou off",
+          type: 3,
+          required: true,
+          choices: [
+            { name: "on", value: "on" },
+            { name: "off", value: "off" },
+          ],
+        },
+      ],
+    },
+    {
+      name: "agradecer",
+      description: "Enviar agradecimento por boost ou doação",
+      options: [
+        {
+          name: "tipo",
+          description: "Tipo de apoio",
+          type: 3,
+          required: true,
+          choices: [
+            { name: "boost", value: "boost" },
+            { name: "doacao", value: "doacao" },
+          ],
+        },
+        {
+          name: "user",
+          description: "Usuário",
+          type: 6,
+          required: true,
+        },
+        {
+          name: "valor",
+          description: "Valor (se for doação)",
+          type: 3,
+          required: false,
+        },
+      ],
+    },
+  ]);
+}
+
 /* ================= READY ================= */
 
 client.once("ready", async () => {
@@ -201,10 +278,6 @@ client.once("ready", async () => {
   } catch (err) {
     console.log("Erro no ready:", err);
   }
-const guild = await client.guilds.fetch(process.env.GUILD_ID);
-const canal = await guild.channels.fetch(process.env.PANEL_CHANNEL_ID);
-
-await canal.send("TESTE FUNCIONANDO");
 });
 
 /* ================= INTERACTION ================= */
