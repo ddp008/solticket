@@ -1153,7 +1153,7 @@ client.on("guildMemberUpdate", async (oldMember, newMember) => {
       const embed = new EmbedBuilder()
         .setTitle("💜 Novo Boost no Servidor!")
         .setDescription(
-`${newMember} muito obrigado pelo **boost** no servidor!\n\nSeu apoio ajuda diretamente no crescimento do Solstice e fortalece ainda mais o projeto. ✨
+`${newMember} muito obrigado pelo **boost** no servidor!\n\nSeu apoio ajuda diretamente no crescimento do Solstice e fortalece ainda mais o projeto. ✨`
         )
         .setColor(0x8b5cf6)
         .setThumbnail(newMember.user.displayAvatarURL())
